@@ -19,6 +19,23 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+const METRICS_USER = process.env.METRICS_USER;
+const METRICS_PASS = process.env.METRICS_PASS;
+
+function checkBasicAuth(req, res) {
+  const header = req.headers.authorization;
+  if (!header || !header.startsWith("Basic ")) {
+    res.set("WWW-Authenticate", 'Basic realm="Metrics"');
+    return false;
+  }
+
+  const base64 = header.split(" ")[1];
+  const [user, pass] = Buffer.from(base64, 'base64').toString().split(":");
+
+  return user === METRICS_USER && pass === METRICS_PASS;
+}
+
+
 app.use(cors());
 app.use(helmet());
 app.use(morgan("dev"));
@@ -35,6 +52,10 @@ app.use("/api/notifications", notificationRoutes);
 
 
 app.get("/metrics", async (req, res) => {
+  if (!checkBasicAuth(req, res)) {
+    return res.status(401).send("Unauthorized");
+  }
+
   res.set("Content-Type", register.contentType);
   res.end(await register.metrics());
 });
